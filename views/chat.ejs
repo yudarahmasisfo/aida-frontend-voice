@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Desa Parit Baru - Voice Assistant</title>
+    <link rel="icon" type="image/png" href="/logo-desa.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top, #f0f9ff 0%, #e0f2fe 100%);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Gaya Visualizer Bar Modern */
+        .visualizer-bar {
+            width: 4px;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+            min-height: 4px;
+        }
+
+        /* Animasi halus saat idle (datar tapi gerak sedikit) */
+        @keyframes idleWave {
+
+            0%,
+            100% {
+                height: 8px;
+            }
+
+            50% {
+                height: 12px;
+            }
+        }
+
+        .animate-idle {
+            animation: idleWave 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="text-center mb-8">
+        <img src="/logo-desa.png" alt="Logo Desa" class="w-16 h-16 mx-auto mb-4 drop-shadow-md">
+        <h1 class="text-3xl font-extrabold text-blue-800 tracking-tight">Voice Assistant Desa Parit Baru</h1>
+        <p class="text-blue-500 font-medium">Layanan Informasi Warga Berbasis Suara</p>
+    </div>
+
+
+    
+    <div class="glass w-full max-w-lg rounded-[40px] shadow-2xl p-8 relative overflow-hidden">
+        <div class="flex justify-between items-center mb-10">
+            <div class="flex items-center gap-2">
+                <div id="status-dot" class="w-3 h-3 bg-slate-300 rounded-full"></div>
+                <span id="status-text" class="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    <%= user.role !=='guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>
+                </span>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button onclick="clearHistory()"
+                    class="flex items-center gap-1 text-slate-400 hover:text-amber-500 transition text-sm font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Bersihkan
+                </button>
+
+                <% if (user.role !=='guest' ) { %>
+                    <button onclick="handleLogout()"
+                        class="flex items-center gap-1 text-red-400 hover:text-red-600 transition text-sm font-semibold border-l pl-4 border-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Keluar
+                    </button>
+                    <% } %>
+            </div>
+        </div>
+
+        <div class="flex justify-center items-center gap-1.5 h-16 mb-8" id="visualizer">
+            <% for(let i=0; i<20; i++) { %>
+                <div class="bg-blue-200 visualizer-bar animate-idle" style="animation-delay: '<%= i * 0.1 %>s'"></div>
+                <% } %>
+        </div>
+
+        <div class="flex justify-center mb-12">
+            <button id="mic-btn" onclick="toggleSpeech()"
+                class="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_0_50px_-12px_rgba(37,99,235,0.5)] hover:scale-110 active:scale-95 transition-all duration-300 group">
+                <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-white" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-20a3 3 0 00-3 3v8a3 3 0 006 0V5a3 3 0 00-3-3z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="space-y-6">
+            <div id="user-box" class="hidden">
+                <p class="text-[10px] font-bold text-blue-500 uppercase mb-2 ml-1 tracking-widest">Suara Anda</p>
+                <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 italic text-slate-700">
+                    "<span id="user-text">...</span>"
+                </div>
+            </div>
+
+            <div id="ai-box" class="hidden">
+                <p class="text-[10px] font-bold text-emerald-500 uppercase mb-2 ml-1 tracking-widest">Jawaban AI</p>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 text-slate-800 leading-relaxed">
+                    <span id="ai-text">...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+
+   <div class="flex flex-col items-center gap-3 mt-8">
+    <div class="flex gap-3">
+        <% if(user.role === 'admin') { %>
+            <span class="px-4 py-2 rounded-full bg-red-600 text-white text-xs font-bold shadow-md">Mode Admin (Unlimited)</span>
+        <% } else if(user.role === 'member') { %>
+            <span class="px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md">Mode Member</span>
+        <% } else { %>
+            <span class="px-4 py-2 rounded-full bg-white text-blue-600 text-xs font-bold shadow-sm border border-blue-100 text-center">Warga (Tamu - Limit 5 Tanya)</span>
+        <% } %>
+    </div>
+
+    <% if(user.role === 'guest') { %>
+        <a href="/login" class="text-blue-500 hover:text-blue-700 text-sm font-bold flex items-center gap-1 transition-all group">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Masuk sebagai Member / Admin
+        </a>
+    <% } %>
+</div>
+
+    <script>
+        const API_URL = "<%= backendUrl %>";
+        const micBtn = document.getElementById('mic-btn');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        let recognition;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.lang = 'id-ID';
+            recognition.continuous = false;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                statusDot.className = "w-3 h-3 bg-red-500 animate-pulse";
+                statusText.innerText = "Mendengarkan...";
+                micBtn.classList.replace('bg-blue-600', 'bg-red-500');
+                startVisualizer('listening'); // Merah mengikuti suara
+            };
+
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                document.getElementById('user-box').classList.remove('hidden');
+                document.getElementById('user-text').innerText = text;
+                sendToAI(text);
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                statusDot.className = "w-3 h-3 bg-slate-300";
+                micBtn.classList.replace('bg-red-500', 'bg-blue-600');
+                // stopVisualizer() tidak dipanggil di sini agar animasi tetap aktif sampai AI menjawab
+            };
+        }
+
+        function toggleSpeech() {
+            if (isRecording) recognition.stop();
+            else recognition.start();
+        }
+
+        async function sendToAI(question) {
+            statusText.innerText = "AIDA sedang berpikir...";
+            try {
+                let token = null;
+                const match = document.cookie.match(new RegExp('(^| )user_data=([^;]+)'));
+                if (match) {
+                    const data = JSON.parse(decodeURIComponent(match[2]));
+                    token = data.token;
+                }
+
+                const res = await axios.post(`${API_URL}/chat/tanya`,
+                    { pertanyaan: question },
+                    { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
+                );
+
+                const answer = res.data.data.jawaban;
+                document.getElementById('ai-box').classList.remove('hidden');
+                document.getElementById('ai-text').innerText = answer;
+                speak(answer);
+
+            } catch (err) {
+                console.error(err);
+                stopVisualizer(); // Berhenti jika error
+                if (err.response && err.response.status === 429) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Limit Tanya Habis',
+                        text: err.response.data.message,
+                        confirmButtonText: 'Masuk (Login)',
+                        confirmButtonColor: '#2563eb'
+                    }).then(() => { window.location.href = '/login'; });
+                } else {
+                    statusText.innerText = "Gagal memproses suara.";
+                }
+            }
+        }
+
+        // --- FUNGSI BARU ---
+        function startVisualizer(status) {
+            const bars = document.querySelectorAll('.visualizer-bar');
+            clearInterval(window.visInterval);
+
+            bars.forEach(bar => bar.classList.remove('animate-idle'));
+
+            window.visInterval = setInterval(() => {
+                bars.forEach(bar => {
+                    let height;
+                    let colorClass;
+
+                    if (status === 'listening') {
+                        height = Math.random() * 50 + 20;
+                        colorClass = 'bg-red-500';
+                    } else if (status === 'speaking') {
+                        height = Math.random() * 60 + 30;
+                        colorClass = 'bg-blue-500';
+                    }
+
+                    bar.style.height = height + 'px';
+                    // Gunakan ini agar class 'visualizer-bar' tetap ada dan warna terupdate
+                    bar.className = `visualizer-bar ${colorClass}`;
+                });
+            }, 100);
+        }
+
+
+
+        function stopVisualizer() {
+            clearInterval(window.visInterval);
+            const bars = document.querySelectorAll('.visualizer-bar');
+            bars.forEach(bar => {
+                bar.style.height = '8px';
+                // Pastikan kembali ke warna default biru muda dan tambahkan lagi animasi idle
+                bar.className = 'bg-blue-200 visualizer-bar animate-idle';
+            });
+        }
+
+        function speak(text) {
+            if (synth) synth.cancel();
+
+            const cleanText = text.replace(/\*/g, '');
+            const utter = new SpeechSynthesisUtterance(cleanText);
+            utter.lang = 'id-ID';
+
+            utter.onstart = () => {
+                statusText.innerText = "AIDA Berbicara...";
+                startVisualizer('speaking');
+            };
+
+            utter.onend = () => {
+                statusText.innerText = "<%= user.role !== 'guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>";
+                stopVisualizer();
+            };
+
+            synth.speak(utter);
+        }
+
+        function clearHistory() {
+            document.getElementById('user-box').classList.add('hidden');
+            document.getElementById('ai-box').classList.add('hidden');
+            document.getElementById('user-text').innerText = "...";
+            document.getElementById('ai-text').innerText = "...";
+
+            // Berhenti bicara otomatis
+            if (synth) synth.cancel();
+
+            stopVisualizer();
+            statusText.innerText = "Riwayat dibersihkan";
+            setTimeout(() => {
+                statusText.innerText = "<%= user.role !== 'guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>";
+            }, 1500);
+        }
+
+        async function handleLogout() {
+            const result = await Swal.fire({
+                title: 'Keluar dari Sesi?',
+                text: "History chat akan dibersihkan dan Anda akan kembali ke mode Tamu.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, Keluar',
+                cancelButtonText: 'Batal'
+            });
+
+            if (result.isConfirmed) {
+                if (synth) synth.cancel();
+                clearHistory();
+                document.cookie = "user_data=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Logout Berhasil',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = '/';
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
