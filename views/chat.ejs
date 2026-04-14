@@ -204,29 +204,45 @@
                     token = data.token;
                 }
 
+                // Request ke Backend
                 const res = await axios.post(`${API_URL}/chat/tanya`,
                     { pertanyaan: question },
                     { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
                 );
 
-                const answer = res.data.data.jawaban;
+                // Ambil jawaban dari struktur data yang benar (sesuai backend kamu)
+                // Jika backend kamu melempar "Pesan Maaf" saat Groq limit, dia akan masuk ke sini
+                const answer = res.data.data ? res.data.data.jawaban : res.data.jawaban;
+
+                // Tampilkan di balon chat AI
                 document.getElementById('ai-box').classList.remove('hidden');
                 document.getElementById('ai-text').innerText = answer;
+                
+                // AIDA mulai berbicara (Suara)
                 speak(answer);
 
             } catch (err) {
-                console.error(err);
-                stopVisualizer(); // Berhenti jika error
+                console.error("Detail Error:", err);
+                stopVisualizer(); 
+
+                // 1. Jika Limit Warga/Guest Habis (429)
                 if (err.response && err.response.status === 429) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Limit Tanya Habis',
-                        text: err.response.data.message,
+                        text: err.response.data.message || 'Silakan login untuk akses tanpa batas.',
                         confirmButtonText: 'Masuk (Login)',
                         confirmButtonColor: '#2563eb'
                     }).then(() => { window.location.href = '/login'; });
-                } else {
-                    statusText.innerText = "Gagal memproses suara.";
+                    statusText.innerText = "Limit tercapai.";
+                } 
+                // 2. Jika Server Benar-benar Error (500) yang tidak tertangani
+                else {
+                    const errorMsg = "Maaf, koneksi ke otak AI terputus. Coba lagi nanti ya.";
+                    document.getElementById('ai-box').classList.remove('hidden');
+                    document.getElementById('ai-text').innerText = errorMsg;
+                    speak(errorMsg);
+                    statusText.innerText = "Gangguan koneksi.";
                 }
             }
         }
