@@ -286,26 +286,35 @@
             });
         }
 
-        function speak(text) {
+        // Tambahkan ini di bagian paling atas file chat.js atau sebelum fungsi speak
+let voices = [];
+
+function loadVoices() {
+    voices = window.speechSynthesis.getVoices();
+}
+
+// Browser butuh waktu untuk memuat daftar suara
+window.speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function speak(text) {
     if (synth) synth.cancel();
 
     const cleanText = text.replace(/\*/g, '');
     const utter = new SpeechSynthesisUtterance(cleanText);
-    
-    // 1. Tetapkan bahasa
-    utter.lang = 'id-ID';
 
-    // 2. KUNCI PERBAIKAN: Cari daftar suara yang tersedia di HP
-    const voices = synth.getVoices();
-    
-    // Cari suara yang benar-benar Indonesia (id-ID)
-    const indonesianVoice = voices.find(voice => 
-        voice.lang === 'id-ID' || voice.lang.includes('id_ID')
-    );
+    // Ambil lagi suara terbaru
+    if (voices.length === 0) loadVoices();
 
-    // Jika ketemu suara Indonesia, pakai! Jika tidak, HP akan pakai default
+    // Cari suara Indonesia yang spesifik
+    const indonesianVoice = voices.find(v => v.lang.startsWith('id'));
+
     if (indonesianVoice) {
         utter.voice = indonesianVoice;
+        utter.lang = 'id-ID';
+    } else {
+        // Fallback jika tidak ketemu, tetap paksa bahasa id
+        utter.lang = 'id-ID';
     }
 
     utter.onstart = () => {
@@ -314,7 +323,7 @@
     };
 
     utter.onend = () => {
-        statusText.innerText = "<%= user.role !== 'guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>";
+        statusText.innerText = "Siap Membantu";
         stopVisualizer();
     };
 
