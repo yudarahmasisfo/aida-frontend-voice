@@ -287,24 +287,45 @@
         }
 
         function speak(text) {
-            if (synth) synth.cancel();
+    if (synth) synth.cancel();
 
-            const cleanText = text.replace(/\*/g, '');
-            const utter = new SpeechSynthesisUtterance(cleanText);
-            utter.lang = 'id-ID';
+    const cleanText = text.replace(/\*/g, '');
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    
+    // 1. Tetapkan bahasa
+    utter.lang = 'id-ID';
 
-            utter.onstart = () => {
-                statusText.innerText = "AIDA Berbicara...";
-                startVisualizer('speaking');
-            };
+    // 2. KUNCI PERBAIKAN: Cari daftar suara yang tersedia di HP
+    const voices = synth.getVoices();
+    
+    // Cari suara yang benar-benar Indonesia (id-ID)
+    const indonesianVoice = voices.find(voice => 
+        voice.lang === 'id-ID' || voice.lang.includes('id_ID')
+    );
 
-            utter.onend = () => {
-                statusText.innerText = "<%= user.role !== 'guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>";
-                stopVisualizer();
-            };
+    // Jika ketemu suara Indonesia, pakai! Jika tidak, HP akan pakai default
+    if (indonesianVoice) {
+        utter.voice = indonesianVoice;
+    }
 
-            synth.speak(utter);
-        }
+    utter.onstart = () => {
+        statusText.innerText = "AIDA Berbicara...";
+        startVisualizer('speaking');
+    };
+
+    utter.onend = () => {
+        statusText.innerText = "<%= user.role !== 'guest' ? 'Sesi: ' + (user.nama || user.username) : 'Siap Membantu' %>";
+        stopVisualizer();
+    };
+
+    synth.speak(utter);
+}
+
+// Tambahan: Kadang daftar suara belum siap saat halaman dimuat
+// Kode ini memastikan daftar suara diambil dulu oleh browser
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = () => synth.getVoices();
+}
 
         function clearHistory() {
             document.getElementById('user-box').classList.add('hidden');
